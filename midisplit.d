@@ -10,11 +10,6 @@ import std.path;
 
 immutable ubyte ub0x80 = 0x80;
 
-@property bool empty(T)(T[] a) { return a.length == 0; }
-@property ref T front(T)(T[] a) { return a[0]; }
-//@property ref T front(T,A)(A a) { return a[0]; }
-void popFront(T)(ref T[] a) { a = a[1 .. $]; }
-
 class MidiHeader {
   //MThd == Midi track header magic no, 0006 == remaining length of header
   ubyte[14] bytes = ['M','T','h','d',0,0,0,6];
@@ -119,7 +114,6 @@ unittest{
 class MidiEvent {
 private:
   uint _deltaTime;
-  ubyte[] _deltaRep;
   ubyte _type; 
   ubyte[] _bytes;
 
@@ -127,26 +121,15 @@ protected:
   @property auto instrument(){ return _bytes[0]; }
   @property auto subtype(){ return _bytes[0]; }
   @property auto type(){ return _type;}
-  @property uint length() { return _deltaRep.length + _type.sizeof + _bytes.length; }
-  @property ubyte[] representation(){return _deltaRep ~ [_type] ~ _bytes;}
-  unittest{
-    auto m = new MidiEvent(100,99,[1,2,3]);
-    assert (m.length == m.representation.length);
-  }
+  @property auto deltaRep(){return intToMidiRep(_deltaTime);}
+  @property uint length() { return deltaRep.length + _type.sizeof + _bytes.length; }
+  @property ubyte[] representation(){return deltaRep ~ [_type] ~ _bytes;}
+
   void setDelta(uint dt){
     _deltaTime = dt;
-    _deltaRep = intToMidiRep(_deltaTime); 
   }
   void setDelta(ubyte[] dt){
-    _deltaRep = dt.dup;
-    _deltaTime = midiRepToInt(_deltaRep);
-  }
-  unittest{
-    auto m = new MidiEvent(100,99,[1,2,3]);
-    m.setDelta(45);
-    assert(m._deltaRep == [45]);
-    m.setDelta([100]);
-    assert(m._deltaTime == 100);
+    _deltaTime = midiRepToInt(dt);
   }
 
   this(uint d, ubyte t, ubyte[] b){
@@ -159,9 +142,14 @@ protected:
     _type = t;
     _bytes = b;
   }
-  bool isInstrumentEventFoo(){
-    return (instrument >= 0x80 && instrument <= 0xAF);
-  }    
+  unittest{
+    auto m = new MidiEvent(100,99,[1,2,3]);
+    assert (m.length == m.representation.length);
+    m.setDelta(45);
+    assert(m.deltaRep == [45]);
+    m.setDelta([100]);
+    assert(m._deltaTime == 100);
+  }
 }
 
   MidiEvent parseMidiEvent(ref ubyte[] bytes){
