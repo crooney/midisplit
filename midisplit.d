@@ -120,8 +120,10 @@ private:
 protected:
   @property auto instrument(){ return _bytes[0]; }
   @property auto subtype(){ return _bytes[0]; }
-  @property auto type(){ return _type;}
-  @property auto deltaRep(){return intToMidiRep(_deltaTime);}
+  @property auto type(){ return _type; }
+  @property auto deltaRep(){ return intToMidiRep(_deltaTime); }
+  @property auto ref deltaTime(){ return _deltaTime;}
+  @property auto ref deltaTime(ubyte[] dt){ _deltaTime = midiRepToInt(dt); return _deltaTime;}
   @property uint length() { return deltaRep.length + _type.sizeof + _bytes.length; }
   @property ubyte[] representation(){return deltaRep ~ [_type] ~ _bytes;}
 
@@ -133,22 +135,20 @@ protected:
   }
 
   this(uint d, ubyte t, ubyte[] b){
-    setDelta(d);
+    _deltaTime = d;
     _type = t;
     _bytes = b;
   }
   this(ubyte[] d, ubyte t, ubyte[] b){
-    setDelta(d);
-    _type = t;
-    _bytes = b;
+    this(midiRepToInt(d),t,b);
   }
   unittest{
     auto m = new MidiEvent(100,99,[1,2,3]);
     assert (m.length == m.representation.length);
-    m.setDelta(45);
-    assert(m.deltaRep == [45]);
-    m.setDelta([100]);
-    assert(m._deltaTime == 100);
+    m.deltaTime = 123;
+    assert(m.deltaRep == [123]);
+    m.deltaTime = [32];
+    assert(m.deltaTime == 32);
   }
 }
 
