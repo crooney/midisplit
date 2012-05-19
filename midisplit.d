@@ -9,30 +9,24 @@ import std.getopt;
 import std.path;
 
 immutable ubyte ub0x80 = 0x80;
-
-class MidiHeader {
-  //MThd == Midi track header magic no, 0006 == remaining length of header
-  ubyte[14] bytes = ['M','T','h','d',0,0,0,6];
-  @property auto ref format() { return bytes[10]; }
-  @property auto ref ntracks(){ return bytes[12]; }
-  this(ubyte[6] b) {
-    bytes[8..$] = b;
-    assert (format < 2);
-    enforce (format < 2);
-  }
-}
+//MThd == MIDI track header magic no, 0006 == remaining length of header
+//bytes 8,9: MIDI format  10,11 num racks 12,13 division (timing) 
+ubyte[14] midiHeader = ['M','T','h','d',0,0,0,6,0,0,0,0,0,0];
 
   class MidiTrack {
   private:
-    ubyte[8] _header = ['M','T','h','d',0,0,0,0];
+    ubyte[8] _header = ['M','T','r','k',0,0,0,0];
     MidiEvent[] _events;
   public:
-    void addEvents(R)(R m)if(is(typeof(front(R)) == MidiEvent)){_events~=m;}
+    //void addEvents(R)(R m)if((is(typeof(front(R)) == MidiEvent)) || (is(typeof(R.front) == MidiEvent))){_events~=m;}
+    void addEvents(R)(R m) {_events~=m;}
     void setTrackLength(uint l){
       for (int i = 0; i < 4; ++i){
 	_header[7-i] = l>>(i*8) & 0xFF;
       }
     }
+    void setTrackLength(){ setTrackLength(length); }
+    @property events() { return _events; }
     @property uint length() {
       auto sum = reduce!(function uint(uint t,MidiEvent m) {return t + m.length;})(0u, _events);
       setTrackLength(sum);
@@ -127,12 +121,7 @@ protected:
   @property uint length() { return deltaRep.length + _type.sizeof + _bytes.length; }
   @property ubyte[] representation(){return deltaRep ~ [_type] ~ _bytes;}
 
-  void setDelta(uint dt){
-    _deltaTime = dt;
-  }
-  void setDelta(ubyte[] dt){
-    _deltaTime = midiRepToInt(dt);
-  }
+  bool isInstrumentEvent(){ return (_type >=0x80) && (_type <= 0xAF); }
 
   this(uint d, ubyte t, ubyte[] b){
     _deltaTime = d;
@@ -245,11 +234,11 @@ public:
 
     void filterTrackInstruments(R)(R insts)
       if (is(typeof(insts.front != 6) == bool)){
-	foreach(ref track; trackInstruments){
-	  auto filtered = filter!(delegate bool(x){return canFind(insts,x);})(sort(track));
-	  track.length = 0;
+	foreach(ref i; trackInstruments){
+	  auto filtered = filter!(delegate bool(x){return canFind(insts,x);})(sort(i));
+	  i.length = 0;
 	  foreach (f ;filtered){
-	    track ~= f;
+	    i ~= f;
 	  }
 	} 
       }
@@ -274,13 +263,37 @@ public:
   }
 }
 
-  MidiTrack parseInputFile(string inFile = Options.inFile,uint trackNum = 1){
+  MidiTrack filteredCopyTrack(U)(MidiTrack inTrack, U insts)
+    if (is (typeof(front(U) != 6) == bool)){
+      uint preserveDelta(uint acc, MidiEvent e) {
+	if (e.isInstrumentEvent && !canFind(insts,e.instrument)) {
+	  acc += e.deltaTime;
+	} else {
+	  e.deltaTime += acc; 
+	  acc=0;
+	}
+	return acc;
+      }
+      auto inEvents = inTrack.events.dup;
+      auto remainder = reduce!(preserveDelta)(0u,inEvents);
+      auto outEvents = filter!(delegate bool(e) {return ((!e.isInstrumentEvent) || canFind(insts,e.instrument));})(inEvents);
+
+      auto t = new MidiTrack;
+      foreach( e; outEvents){
+	t.addEvents(e);
+      }
+      t.setTrackLength();
+      return t;
+    } 
+
+MidiTrack parseInputFile(string inFile = Options.inFile, uint trackNum = 1){
     enforce(exists(inFile),inFile ~ " does not exist.");
     auto bytes = cast(ubyte[]) read(inFile);
     enforce(bytes.length >= 25,inFile ~ " is too small to be a MIDI file.");
     enforce(startsWith(bytes,['M','T','h','d']),inFile ~ " is not a MIDI file.");
+    midiHeader[] = bytes[0..14];
     popFrontN(bytes,14);
-    //use findSkip for finding a single track in a multitrack file
+    //TODO: use findSkip for finding a single track in a multitrack file
     enforce(startsWith(bytes,['M','T','r','k']),inFile ~ " has no track at expected point in file");
     debug {
       popFrontN(bytes,4);
@@ -304,11 +317,24 @@ public:
 int main(string[] args){
   try {
     Options.processOptions(args);
-    auto track = parseInputFile();
+    auto inTrack = parseInputFile();
     //writeln(track.representation);
-    auto uniqs = array(track.uniqueInstruments);
+    auto uniqs = array(inTrack.uniqueInstruments);
     writeln(uniqs);
     Options.filterTrackInstruments(uniqs);
+    auto nTracks = count!("!a.empty")(Options.trackInstruments);
+    MidiTrack outTracks[];
+    ubyte[] outBytes = midiHeader;
+    outBytes[9] = 1; // MIDI format 1 (multitrack)
+    outBytes[11] = cast(ubyte)nTracks;
+    auto m = new MidiTrack;
+    foreach ( f; Options.trackInstruments){
+      if(f.empty) break;
+      m = filteredCopyTrack(inTrack,f); 
+      outBytes ~= m.representation;
+    }
+    std.file.write(Options.outFile,outBytes);
+
   }catch(Exception e){
     debug{
       throw e;
