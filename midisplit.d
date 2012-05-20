@@ -9,7 +9,8 @@ import std.conv;
 import std.getopt;
 import std.path;
 
-immutable ubyte ub0x80 = 0x80;
+immutable ubyte ub0x80 = 0x80;//can't say 0x80ub as you could 0x80uL to specify type
+
 //MThd == MIDI track header magic no, 0006 == remaining length of header
 //bytes 8,9: MIDI format  10,11 num racks 12,13 division (timing) 
 ubyte[14] midiHeader = ['M','T','h','d',0,0,0,6,0,0,0,0,0,0];
@@ -19,7 +20,6 @@ ubyte[14] midiHeader = ['M','T','h','d',0,0,0,6,0,0,0,0,0,0];
     ubyte[8] _header = ['M','T','r','k',0,0,0,0];
     MidiEvent[] _events;
   public:
-    //void addEvents(R)(R m)if((is(typeof(front(R)) == MidiEvent)) || (is(typeof(R.front) == MidiEvent))){_events~=m;}
     void addEvents(MidiEvent[] m) {_events~=m;}
     void addEvents(MidiEvent m) {_events~=m;}
     void setTrackLength(uint l){
@@ -118,9 +118,9 @@ protected:
   @property auto type(){ return _type; }
   @property auto deltaRep(){ return intToMidiRep(_deltaTime); }
   @property auto ref deltaTime(){ return _deltaTime;}
-  @property auto ref deltaTime(ubyte[] dt){ _deltaTime = midiRepToInt(dt); return _deltaTime;}
+  @property auto ref deltaTime(ubyte[] dt){ _deltaTime = midiRepToInt(dt); return _deltaTime; }
   @property uint length() { return deltaRep.length + _type.sizeof + _bytes.length; }
-  @property ubyte[] representation(){return deltaRep ~ [_type] ~ _bytes;}
+  @property ubyte[] representation(){ return deltaRep ~ [_type] ~ _bytes; }
 
   bool isInstrumentEvent(){ return (_type >=0x80) && (_type <= 0xAF); }
 
@@ -182,12 +182,8 @@ public:
     string[] trackNames;
     string inFile;
     string outFile;
-    bool analyzeOnly = false;
     bool useGmNames = false;
     bool instrumentPerTrack = false;
-    bool sysexInAllTracks = false;
-
-    bool validCommandline = true;
 
     void processOptions(ref string[] opts){
       void usage(){
@@ -203,7 +199,7 @@ public:
 		     "\nIf no option is specified the default is to split into the following\n"
 		     "tracks: Kick(s), Snare(s), Toms, Hi-hats, Cymbals, Metallic Percussion,\n"
 		     "Latin Drums and Latin Percussion, with those track names.\n\n"
-		     "See manual page for detailed help."
+		     "See manual page for detailed instructions."
 		     );
 	throw new Exception("");
       }
@@ -218,7 +214,6 @@ public:
 	     "outfile|o", &outFile,
 	     "gmnames|g", &useGmNames,
 	     "solo|s", &instrumentPerTrack,
-	     "sysex|x", &sysexInAllTracks,
 	     "names|n", &addTrackNames,
 	     "track|t", &addTrackInstruments,
 	     "help|usage|h", &usage);
@@ -248,6 +243,13 @@ public:
 	trackNames = ["Kick","Snare","Toms","Hi-hats","Cymbals","Metallic Percussion","Latin Drums","Latin Percussion"];
       }
     }
+    string makeTrackName(ubyte[] insts){
+      string name;
+      foreach(i; insts){
+	name ~= gmName(i) ~ " ";
+      }
+      return name;
+    }
   }
   unittest{
     version(none){
@@ -260,7 +262,7 @@ public:
   }
 }
 
-  MidiTrack filteredCopyTrack(U)(MidiTrack inTrack, U insts)
+  MidiTrack filteredCopyTrack(U)(MidiTrack inTrack, U insts,string trackName)
     if (is (typeof(front(U) != 42) == bool)){
       MidiEvent[] inEvents = inTrack.events.dup;
       uint acc;
@@ -272,8 +274,15 @@ public:
       	  acc = 0;
       	}
       }
-      auto outEvents = filter!(delegate bool(e) {return ((!e.isInstrumentEvent) || canFind(insts,e.instrument));})(inEvents);
+      auto outEvents = filter!(delegate bool(e) { return 
+	    (((!e.isInstrumentEvent) || canFind(insts,e.instrument)) 
+	     && ((e.type != 0xFF) || (e.subtype != 0x03))) //strip any track name event
+	    ; })(inEvents);
       auto t = new MidiTrack;
+      ubyte[] nBytes = [ 0x03, cast(ubyte)trackName.length ];
+      nBytes ~= trackName;
+      auto nEvent = MidiEvent(0,0xFF,nBytes);
+      t.addEvents(nEvent);
       foreach( e; outEvents){
 	t.addEvents(e);
       }
@@ -320,8 +329,15 @@ int main(string[] args){
     outBytes[9] = 1; // MIDI format 1 (multitrack)
     outBytes[11] = cast(ubyte)nTracks;
     foreach ( f; Options.trackInstruments){
+      string trackName;
+      if (!Options.trackNames.empty){
+	trackName = front(Options.trackNames);
+	Options.trackNames.popFront();
+      }else{
+	trackName = Options.makeTrackName(f);
+      }      
       if(f.empty) continue;
-      outBytes ~=  filteredCopyTrack(inTrack,f).representation;       
+      outBytes ~=  filteredCopyTrack(inTrack,f,trackName).representation;       
     }
     std.file.write(Options.outFile,outBytes);
 
