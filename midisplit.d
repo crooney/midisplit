@@ -191,19 +191,21 @@ public:
 
     void processOptions(ref string[] opts){
       void usage(){
-	stderr.write(
-		     "Usage: midisplit [OPTION]... FILE\n"
-		     "  -a, --analyze\t\tdon't process, only analyze MIDI of FILE\n"
+	stderr.write("Usage: midisplit [OPTION]... FILE\n"
 		     "  -g, --gmnames\t\tuse standard General MIDI names for tracks\n"
 		     "  -n, --names  \t\tnames for tracks.  May be comma separated\n"
 		     "               \t\t  or repeated for multiples\n"
 		     "  -o, --outfile\t\toutput file name.  Default is to adapt FILE name.\n"
-		     "  -s, --solo   \t\tuse one track per instrument in FILE\n"
-		     "  -t, --track  \t\tgroups of comma separated instruments that should\n"
-		     "               \t\t  be on the same track.  May be repeated\n"
-		     "  -x, --sysex  \t\trepeat sysex events in all tracks\n"
+		     "  -s, --solo   \t\tuse one track per note/instrument in FILE\n"
+		     "  -t, --track  \t\tgroups of comma separated notes/instruments that\n"
+		     "               \t\t  should be on the same track.  May be repeated\n"
 		     "  -h, --help,--usage\tprint this message\n"
+		     "\nIf no option is specified the default is to split into the following\n"
+		     "tracks: Kick(s), Snare(s), Toms, Hi-hats, Cymbals, Metallic Percussion,\n"
+		     "Latin Drums and Latin Percussion, with those track names.\n\n"
+		     "See manual page for detailed help."
 		     );
+	throw new Exception("");
       }
       void addTrackNames(string opt, string val){
 	trackNames ~= split!(string,string)(val,",");
@@ -214,22 +216,22 @@ public:
       }
       getopt(opts,
 	     "outfile|o", &outFile,
-	     "analyze|a", &analyzeOnly,
 	     "gmnames|g", &useGmNames,
 	     "solo|s", &instrumentPerTrack,
 	     "sysex|x", &sysexInAllTracks,
 	     "names|n", &addTrackNames,
 	     "track|t", &addTrackInstruments,
 	     "help|usage|h", &usage);
-      useDefaults(trackInstruments.empty,trackNames.empty);
-      popFront(opts);
+      if (!instrumentPerTrack && trackInstruments.empty)
+	useDefaults(trackNames.empty);
+      popFront(opts);//executable name -- argv[0]
       enforce(!opts.empty,"No FILE specified.  Run with -h for usage."); 
       inFile = front(opts);
       if (outFile.empty){outFile = stripExtension(baseName(inFile)) ~ "SPLIT" ~ extension(inFile);}
     }
 
     void filterTrackInstruments(R)(R insts)
-      if (is(typeof(insts.front != 6) == bool)){
+      if (is(typeof(insts.front != 42) == bool)){
 	foreach(ref i; trackInstruments){
 	  auto filtered = filter!(delegate bool(x){return canFind(insts,x);})(sort(i));
 	  i.length = 0;
@@ -239,12 +241,11 @@ public:
 	} 
       }
 
-    void useDefaults(bool instruments, bool names){
-      if (instruments){
-	trackInstruments = [ [35,36] , [38,40] ];
-      }
+    void useDefaults(bool names){
+	trackInstruments = [ [35,36] , [37,38,39,40] , [41,43,45,47,48,50] , [42,44,46] , [49,51,52,53,55,57,59],
+			     [56,54,80,81] , [60,61,62,63,64,65,66,78,79] , [67,68,69,70,71,72,73,74,75,76,77] ];
       if (names){
-	trackNames = ["Kick","Snare"];
+	trackNames = ["Kick","Snare","Toms","Hi-hats","Cymbals","Metallic Percussion","Latin Drums","Latin Percussion"];
       }
     }
   }
@@ -260,7 +261,7 @@ public:
 }
 
   MidiTrack filteredCopyTrack(U)(MidiTrack inTrack, U insts)
-    if (is (typeof(front(U) != 6) == bool)){
+    if (is (typeof(front(U) != 42) == bool)){
       MidiEvent[] inEvents = inTrack.events.dup;
       uint acc;
       foreach (ref e; inEvents){
