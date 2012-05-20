@@ -19,7 +19,8 @@ ubyte[14] midiHeader = ['M','T','h','d',0,0,0,6,0,0,0,0,0,0];
     MidiEvent[] _events;
   public:
     //void addEvents(R)(R m)if((is(typeof(front(R)) == MidiEvent)) || (is(typeof(R.front) == MidiEvent))){_events~=m;}
-    void addEvents(R)(R m) {_events~=m;}
+    void addEvents(MidiEvent[] m) {_events~=m;}
+    void addEvents(MidiEvent m) {_events~=m;}
     void setTrackLength(uint l){
       for (int i = 0; i < 4; ++i){
 	_header[7-i] = l>>(i*8) & 0xFF;
@@ -39,8 +40,8 @@ ubyte[14] midiHeader = ['M','T','h','d',0,0,0,6,0,0,0,0,0,0];
       return _header ~ r;
     }
     unittest{
-      auto m1 = new MidiEvent(100,99,[1,2,3]);
-      auto m2 = new MidiEvent(101,45,[1,2,3,1,2,3,1,2,3]);
+      auto m1 = MidiEvent(100,99,[1,2,3]);
+      auto m2 = MidiEvent(101,45,[1,2,3,1,2,3,1,2,3]);
       auto t = new MidiTrack;
       t.addEvents([m1,m2]);
       writeln(t.representation);
@@ -57,8 +58,8 @@ ubyte[14] midiHeader = ['M','T','h','d',0,0,0,6,0,0,0,0,0,0];
       return sort(r.keys);
     }
     unittest{
-      auto m1 = new MidiEvent(90,0x81,[61,2,3]);
-      auto m2 = new MidiEvent(99,0x99,[35,2,3,1,2,3,1,2,3]);
+      auto m1 = MidiEvent(90,0x81,[61,2,3]);
+      auto m2 = MidiEvent(99,0x99,[35,2,3,1,2,3,1,2,3]);
       auto t = new MidiTrack;
       t.addEvents([m1,m2]);
       version(none)t.uniqueInstruments();
@@ -105,7 +106,7 @@ unittest{
   assert (intToMidiRep(0x0FFFFFFF) == [0xFF,0xFF,0xFF,0x7F]);
 }
 
-class MidiEvent {
+struct MidiEvent {
 private:
   uint _deltaTime;
   ubyte _type; 
@@ -166,7 +167,7 @@ protected:
     }else{
       throw new Exception ("Unknown MIDI event type -- " ~ type);
     }
-    return new MidiEvent(deltaRep,type,data);				 
+    return MidiEvent(deltaRep,type,data);				 
   }
 
 unittest{
@@ -267,14 +268,14 @@ public:
     if (is (typeof(front(U) != 6) == bool)){
       uint preserveDelta(uint acc, MidiEvent e) {
 	if (e.isInstrumentEvent && !canFind(insts,e.instrument)) {
-	  acc += e.deltaTime;
+	  return e.deltaTime;
 	} else {
 	  e.deltaTime += acc; 
-	  acc=0;
+	  return 0;
 	}
-	return acc;
       }
-      auto inEvents = inTrack.events.dup;
+      MidiEvent[] inEvents = inTrack.events[0..$];
+
       auto remainder = reduce!(preserveDelta)(0u,inEvents);
       auto outEvents = filter!(delegate bool(e) {return ((!e.isInstrumentEvent) || canFind(insts,e.instrument));})(inEvents);
 
@@ -282,6 +283,7 @@ public:
       foreach( e; outEvents){
 	t.addEvents(e);
       }
+      writefln("%u events added in filteredCopyTrack",t.events.length); 
       t.setTrackLength();
       return t;
     } 
@@ -309,6 +311,7 @@ MidiTrack parseInputFile(string inFile = Options.inFile, uint trackNum = 1){
     while (!bytes.empty){
       t.addEvents([parseMidiEvent(bytes)]);
     }
+    writefln("%d events added in parseInputFile",t.events.length);
     return t;
   }
 
