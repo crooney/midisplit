@@ -9,6 +9,8 @@ import std.conv;
 import std.getopt;
 import std.path;
 
+@safe
+
 immutable ubyte ub0x80 = 0x80;//can't say 0x80ub as you could 0x80uL to specify type
 
 //MThd == MIDI track header magic no, 0006 == remaining length of header
@@ -51,8 +53,8 @@ ubyte[14] midiHeader = ['M','T','h','d',0,0,0,6,0,0,0,0,0,0];
     auto uniqueInstruments(){
       //select only events that concern instruments
       auto events = filter!(function bool(a){return (a.type >=0x80) && (a.type <= 0xAF);})(_events);
-      ubyte[uint] r;
       //remove dups
+      ubyte[uint] r;
       r = reduce!(function ubyte[uint](ubyte[uint] acc, MidiEvent m)
 			      { acc[m.instrument]++; return acc; })(r, events);
       return sort(r.keys);
@@ -230,18 +232,6 @@ public:
       inFile = front(opts);
       if (outFile.empty){outFile = stripExtension(baseName(inFile)) ~ "SPLIT" ~ extension(inFile);}
     }
-
-    void filterTrackInstruments(R)(R insts)
-      if (is(typeof(insts.front != 42) == bool)){
-	foreach(ref i; trackInstruments){
-	  auto filtered = filter!(delegate bool(x){return canFind(insts,x);})(sort(i));
-	  i.length = 0;
-	  foreach (f ;filtered){
-	    i ~= f;
-	  }
-	} 
-      }
-
     void useDefaults(bool names){
 	trackInstruments = [ [35,36] , [37,38,39,40] , [41,43,45,47,48,50] , [42,44,46] , [49,51,52,53,55,57,59],
 			     [56,54,80,81] , [60,61,62,63,64,65,66,78,79] , [67,68,69,70,71,72,73,74,75,76,77] ];
@@ -249,11 +239,21 @@ public:
 	trackNames = ["Kick","Snare","Toms","Hi-hats","Cymbals","Metallic Percussion","Latin Drums","Latin Percussion"];
       }
     }
-    string makeTrackName(ubyte[] insts){
+    string nextTrackName(T)(T insts){
+      if (!Options.trackNames.empty){
+	string trackName = front(Options.trackNames);
+	Options.trackNames.popFront();
+	return trackName;
+      }else{
+	return Options.makeTrackName(insts);
+      }      
+    }
+    string makeTrackName(T)(T insts){
       string name;
       foreach(i; insts){
-	name ~= (useGmNames ? gmName(i) : noteName(i)) ~ " ";
+	name ~= (useGmNames ? gmName(i) : noteName(i)) ~ "|";
       }
+      name = name[0 .. $-1];
       return name;
     }
   }
@@ -268,8 +268,7 @@ public:
   }
 }
 
-  MidiTrack filteredCopyTrack(U)(MidiTrack inTrack, U insts,string trackName)
-    if (is (typeof(front(U) != 42) == bool)){
+  MidiTrack makeFilteredTrack(U)(MidiTrack inTrack, U insts,string trackName){
       MidiEvent[] inEvents = inTrack.events.dup;
       uint acc;
       foreach (ref e; inEvents){
@@ -322,31 +321,25 @@ MidiTrack parseInputFile(string inFile = Options.inFile, uint trackNum = 1){
     return t;
   }
 
-
-
 int main(string[] args){
   try {
     Options.processOptions(args);
     auto inTrack = parseInputFile();
     auto uniqs = array(inTrack.uniqueInstruments);
-    Options.filterTrackInstruments(uniqs);
-    auto nTracks = count!("!a.empty")(Options.trackInstruments);
+    ubyte nTracks = 0;
     ubyte[] outBytes = midiHeader;
-    outBytes[9] = 1; // MIDI format 1 (multitrack)
-    outBytes[11] = cast(ubyte)nTracks;
     foreach ( f; Options.trackInstruments){
-      string trackName;
-      if (!Options.trackNames.empty){
-	trackName = front(Options.trackNames);
-	Options.trackNames.popFront();
-      }else{
-	trackName = Options.makeTrackName(f);
-      }      
-      if(f.empty) continue;
-      outBytes ~=  filteredCopyTrack(inTrack,f,trackName).representation;       
+      auto found = filter!(delegate bool(x){return canFind(uniqs,x);})(sort(f));	  
+      if(found.empty){
+	Options.nextTrackName(found); //need to burn off a name
+	continue;
+      }
+      nTracks++;
+      outBytes ~=  makeFilteredTrack(inTrack,found,Options.nextTrackName(found)).representation;       
     }
+    outBytes[9] = nTracks > 1 ? 1 : 0; // MIDI format 1 is multitrack
+    outBytes[11] = nTracks;
     std.file.write(Options.outFile,outBytes);
-
   }catch(Exception e){
     debug{
       throw e;
@@ -357,6 +350,10 @@ int main(string[] args){
   }
   return 0;
 }
+
+/*
+  This stuff after main is essentially logic free
+ */
 
 ubyte bytesTakenByMidiType(ubyte type){
   switch (type){
@@ -377,105 +374,55 @@ string noteName(int inst){
 }
 
 string gmName(int inst){
-
   switch(inst){
-
-  case 35:
-    return "Bass Drum 2";
-  case 36:
-    return "Bass Drum 1";
-  case 37:
-    return "Side Stick/Rimshot";
-  case 38:
-    return "Snare Drum 1";
-  case 39:
-    return "Hand Clap";
-  case 40:
-    return "Snare Drum 2";
-  case 41:
-    return "Low Tom 2";
-  case 42:
-    return "Closed Hi-hat";
-  case 43:
-    return "Low Tom 1";
-  case 44:
-    return "Pedal Hi-hat";
-  case 45:
-    return "Mid Tom 2";
-  case 46:
-    return "Open Hi-hat";
-  case 47:
-    return "Mid Tom 1";
-  case 48:
-    return "High Tom 2";
-  case 49:
-    return "Crash Cymbal 1";
-  case 50:
-    return "High Tom 1";
-  case 51:
-    return "Ride Cymbal 1";
-  case 52:
-    return "Chinese Cymbal";
-  case 53:
-    return "Ride Bell";
-  case 54:
-    return "Tambourine";
-  case 55:
-    return "Splash Cymbal";
-  case 56:
-    return "Cowbell";
-  case 57:
-    return "Crash Cymbal 2";
-  case 58:
-    return "Vibra Slap";
-  case 59:
-    return "Ride Cymbal 2";
-  case 60:
-    return "High Bongo";
-  case 61:
-    return "Low Bongo";
-  case 62:
-    return "Mute High Conga";
-  case 63:
-    return "Open High Conga";
-  case 64:
-    return "Low Conga";
-  case 65:
-    return "High Timbale";
-  case 66:
-    return "Low Timbale";
-  case 67:
-    return "High Agogô";
-  case 68:
-    return "Low Agogô";
-  case 69:
-    return "Cabasa";
-  case 70:
-    return "Maracas";
-  case 71:
-    return "Short Whistle";
-  case 72:
-    return "Long Whistle";
-  case 73:
-    return "Short Güiro";
-  case 74:
-    return "Long Güiro";
-  case 75:
-    return "Claves";
-  case 76:
-    return "High Wood Block";
-  case 77:
-    return "Low Wood Block";
-  case 78:
-    return "Mute Cuíca";
-  case 79:
-    return "Open Cuíca";
-  case 80:
-    return "Mute Triangle";
-  case 81:
-    return "Open Triangle";
-  default:
-    return text(inst);
+  case 35: return "Bass Drum 2";
+  case 36: return "Bass Drum 1";
+  case 37: return "Side Stick/Rimshot";
+  case 38: return "Snare Drum 1";
+  case 39: return "Hand Clap";
+  case 40: return "Snare Drum 2";
+  case 41: return "Low Tom 2";
+  case 42: return "Closed Hi-hat";
+  case 43: return "Low Tom 1";
+  case 44: return "Pedal Hi-hat";
+  case 45: return "Mid Tom 2";
+  case 46: return "Open Hi-hat";
+  case 47: return "Mid Tom 1";
+  case 48: return "High Tom 2";
+  case 49: return "Crash Cymbal 1";
+  case 50: return "High Tom 1";
+  case 51: return "Ride Cymbal 1";
+  case 52: return "Chinese Cymbal";
+  case 53: return "Ride Bell";
+  case 54: return "Tambourine";
+  case 55: return "Splash Cymbal";
+  case 56: return "Cowbell";
+  case 57: return "Crash Cymbal 2";
+  case 58: return "Vibra Slap";
+  case 59: return "Ride Cymbal 2";
+  case 60: return "High Bongo";
+  case 61: return "Low Bongo";
+  case 62: return "Mute High Conga";
+  case 63: return "Open High Conga";
+  case 64: return "Low Conga";
+  case 65: return "High Timbale";
+  case 66: return "Low Timbale";
+  case 67: return "High Agogô";
+  case 68: return "Low Agogô";
+  case 69: return "Cabasa";
+  case 70: return "Maracas";
+  case 71: return "Short Whistle";
+  case 72: return "Long Whistle";
+  case 73: return "Short Güiro";
+  case 74: return "Long Güiro";
+  case 75: return "Claves";
+  case 76: return "High Wood Block";
+  case 77: return "Low Wood Block";
+  case 78: return "Mute Cuíca";
+  case 79: return "Open Cuíca";
+  case 80: return "Mute Triangle";
+  case 81: return "Open Triangle";
+  default: return text(inst);
   }
 }
 unittest{
