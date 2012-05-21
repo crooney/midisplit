@@ -182,13 +182,14 @@ public:
     string[] trackNames;
     string inFile;
     string outFile;
-    bool useGmNames = false;
+    bool useGmNames = true;
     bool instrumentPerTrack = false;
 
     void processOptions(ref string[] opts){
       void usage(){
 	stderr.write("Usage: midisplit [OPTION]... FILE\n"
-		     "  -g, --gmnames\t\tuse standard General MIDI names for tracks\n"
+		     "  -g, --gmnames\t\tuse General MIDI percussion names for tracks\n"
+		     "  -m, --melodic\t\tuse note names for tracks"
 		     "  -n, --names  \t\tnames for tracks.  May be comma separated\n"
 		     "               \t\t  or repeated for multiples\n"
 		     "  -o, --outfile\t\toutput file name.  Default is to adapt FILE name.\n"
@@ -213,6 +214,7 @@ public:
       getopt(opts,
 	     "outfile|o", &outFile,
 	     "gmnames|g", &useGmNames,
+	     "melodic|m", delegate(){ useGmNames = false; },
 	     "solo|s", &instrumentPerTrack,
 	     "names|n", &addTrackNames,
 	     "track|t", &addTrackInstruments,
@@ -246,7 +248,7 @@ public:
     string makeTrackName(ubyte[] insts){
       string name;
       foreach(i; insts){
-	name ~= gmName(i) ~ " ";
+	name ~= (useGmNames ? gmName(i) : noteName(i)) ~ " ";
       }
       return name;
     }
@@ -363,6 +365,11 @@ ubyte bytesTakenByMidiType(ubyte type){
   default:
     throw new Exception("No fixed Midi data length for" ~ type);
   }
+}
+
+string noteName(int inst){
+  string[] notes = ["C","C#","D","D#","E","F","G","G#","A","A#","B","C" ];
+  return notes[inst % 12] ~ to!string(inst/12);
 }
 
 string gmName(int inst){
