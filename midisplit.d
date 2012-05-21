@@ -183,7 +183,6 @@ public:
     string inFile;
     string outFile;
     bool useGmNames = true;
-    bool instrumentPerTrack = false;
 
     void processOptions(ref string[] opts){
       void usage(){
@@ -211,6 +210,11 @@ public:
 	val = "[" ~ val ~ "]";
 	trackInstruments ~= parse!(ubyte[],string)(val);
       }
+      void instrumentPerTrack(){
+	trackInstruments.length = 0x80;
+	foreach(i, ref e; trackInstruments)
+	  e = [cast(ubyte)i];
+      }
       getopt(opts,
 	     "outfile|o", &outFile,
 	     "gmnames|g", &useGmNames,
@@ -219,7 +223,7 @@ public:
 	     "names|n", &addTrackNames,
 	     "track|t", &addTrackInstruments,
 	     "help|usage|h", &usage);
-      if (!instrumentPerTrack && trackInstruments.empty)
+      if (trackInstruments.empty)
 	useDefaults(trackNames.empty);
       popFront(opts);//executable name -- argv[0]
       enforce(!opts.empty,"No FILE specified.  Run with -h for usage."); 
