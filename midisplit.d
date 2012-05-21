@@ -11,8 +11,6 @@ import std.path;
 
 @safe
 
-immutable ubyte ub0x80 = 0x80;//can't say 0x80ub as you could 0x80uL to specify type
-
 //MThd == MIDI track header magic no, 0006 == remaining length of header
 //bytes 8,9: MIDI format  10,11 num racks 12,13 division (timing) 
 ubyte[14] midiHeader = ['M','T','h','d',0,0,0,6,0,0,0,0,0,0];
@@ -145,14 +143,14 @@ protected:
 }
 
   MidiEvent parseMidiEvent(ref ubyte[] bytes){
-    auto tup = findSplitAfter!(function (x,y){ return (x < y); })(bytes,[ub0x80]);
+    auto tup = findSplitAfter!(function (x,y){ return (x < y); })(bytes,[0x80]);
     enforce((!tup[0].empty) && (!tup[1].empty));
     auto deltaRep = tup[0];
     bytes = tup[1];
     auto type = front(bytes);
     popFront(bytes);
     ubyte[] data;
-    if (type >= ub0x80 && type < 0xF0){
+    if (type >= 0x80 && type < 0xF0){
       data = bytes[0 .. bytesTakenByMidiType(type)];
       bytes = bytes[bytesTakenByMidiType(type) .. $];
     }else if (type == 0xFF){
