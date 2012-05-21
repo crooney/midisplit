@@ -1,4 +1,4 @@
-//          Copyright Christopher Rooney 2012.
+//          Copyright © Christopher Rooney 2012.
 // Distributed under the Boost Software License, Version 1.0.
 //    (See accompanying file LICENSE_1_0.txt or copy at
 //          http://www.boost.org/LICENSE_1_0.txt)
@@ -208,6 +208,10 @@ public:
 		     );
 	throw new Exception("");
       }
+      void displayVersion(){
+	writefln("midisplit version %.1f.\n%s",release_version,copyright);
+ 	throw new Exception("");
+      }
       void addTrackNames(string opt, string val){
 	trackNames ~= split!(string,string)(val,",");
       }
@@ -227,7 +231,8 @@ public:
 	     "solo|s", &instrumentPerTrack,
 	     "names|n", &addTrackNames,
 	     "track|t", &addTrackInstruments,
-	     "help|usage|h", &usage);
+	     "help|usage|h", &usage,
+	     "version",&displayVersion);
       if (trackInstruments.empty)
 	useDefaults(trackNames.empty);
       popFront(opts);//executable name -- argv[0]
@@ -433,3 +438,10 @@ unittest{
   assert (gmName(29) == "29");
   assert (gmName(74) == "Long Güiro");
 }
+
+immutable float release_version = 1.0;
+string copyright = r"Copyright © Christopher Rooney 2012.
+Distributed under the Boost Software License, Version 1.0.
+http://www.boost.org/LICENSE_1_0.txt
+FSM approved. This is free software. 
+There is no warranty. May create skynet.";
