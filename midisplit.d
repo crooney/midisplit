@@ -193,7 +193,7 @@ public:
       void usage(){
 	stderr.write("Usage: midisplit [OPTION]... FILE\n"
 		     "  -g, --gmnames\t\tuse General MIDI percussion names for tracks\n"
-		     "  -m, --melodic\t\tuse note names for tracks"
+		     "  -m, --melodic\t\tuse note names for tracks\n"
 		     "  -n, --names  \t\tnames for tracks.  May be comma separated\n"
 		     "               \t\t  or repeated for multiples\n"
 		     "  -o, --outfile\t\toutput file name.  Default is to adapt FILE name.\n"
