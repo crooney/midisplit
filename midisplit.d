@@ -3,6 +3,9 @@
 //    (See accompanying file LICENSE_1_0.txt or copy at
 //          http://www.boost.org/LICENSE_1_0.txt)
 
+// Sorry about the funky indentation.  Using c++-mode in emacs.  
+// Don't like to use a pretty printer because it makes diffing hard.
+
 import std.stdio;
 import std.exception;
 import std.array;
