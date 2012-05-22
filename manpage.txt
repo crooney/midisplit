@@ -1,0 +1,92 @@
+MIDISPLIT(1)                                                      MIDISPLIT(1)
+
+
+
+NAME
+       midisplit - split a MIDI file into multiple tracks
+
+SYNOPSIS
+       midisplit [ OPTIONS ] FILE
+
+DESCRIPTION
+       midisplit takes a MIDI file with one track and splits that track into a
+       multitrack MIDI file, according to MIDI note number.  Its original pur-
+       pose  was  to  process  the  output  of software drum machines, and the
+       default behaviour reflects that.
+
+       The default is to split the track into  groups  of  similar  percussion
+       instruments.  See examples.
+
+       NB:  When  using  MIDI, numbers that specify notes are used for instru-
+       ments on percussion tracks, and the usage and documentation  of  midis-
+       plit generally use 'note' and 'instrument' interchangably.
+
+OPTIONS
+       -g, --gmnames
+              use  General  MIDI  percussion  names  for  tracks.  This is the
+              default if track numbers are specified.
+
+       -m, --melodic
+              use note names for tracks.  Specifically  note  and  octave:  'C
+              4','F# 3', etc.
+
+       -n, --names
+              specify  names  for tracks.  May be comma separated or repeated:
+              -nKick,Snare is equivalent to -nKick -nSnare.
+
+       -o, --outfile
+              output file name.  Default is to modify FILE so that mymusic.mid
+              becomes mymusicSPLIT.mid.
+
+       -s, --solo
+              create one track for each note/instrument in FILE
+
+       -t, --track
+              put  groups  of  comma separated notes/instruments on one track.
+              May be repeated: -t35,36 -t42,44 would create a two  track  file
+              with two notes/instruments each.
+
+       -h, --help,--usage
+              display help and exit.
+
+       --version
+              display version information and exit.
+
+EXAMPLES
+       midisplit mymusic.mid
+              Create  a  file called mymusicSPLIT.mid comprising the following
+              tracks: Kick, Snare, Toms, Hi-hats,  Cymbals,  Metallic  Percus-
+              sion,  Latin  Drums  and  Latin  Percussion, assuming that mymu-
+              sic.mid has at least one instrument in each category.
+
+       midisplit -t35,36 -nKick -t42,44,46 -nHats -omykickhats.mid mymusic.mid
+              Split mymusic.mid into 2 tracks called Kick and Hats in  a  file
+              called mykickhats.mid.
+
+       midisplit -t35,36 -t42,44,46 -nKick,Hats -omykickhats.mid mymusic.mid
+              Exactly equivalent to above.
+
+       midisplit -m -s mymusic.mid
+              Create  a  file called mymusicSPLIT.mid that has each note value
+              in mymusic.mid on its own track, named for the note.
+
+AUTHOR
+       Written by Christopher J. Rooney. Contact  at  christopher.j.rooney  at
+       that obscure email service google has.
+
+BUGS
+       Only takes MIDI format 0 (single track) files as input.
+
+COPYRIGHT
+       Copyright  A(C)  2012  Christopher  J.  Rooney. License: Boost Software
+       License, Version 1.0. <http://www.boost.org/LICENSE_1_0.txt>
+
+       FSM approved. This is free software. There is no warranty.  May  create
+       skynet.
+
+SEE ALSO
+       MIDI specification and resources available at <http://www.midi.org>
+
+
+
+                                  21 May 2012                     MIDISPLIT(1)
