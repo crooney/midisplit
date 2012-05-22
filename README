@@ -6,7 +6,7 @@ are a bunch of options and ways to split or filter the MIDI file.  Check the
 man page.
 
 To build you need a D compiler.  The makefile assumes dmd.  If you install, it 
-defaults to /usr/local. just do
+defaults to /usr/local. Just do
 
 make
 sudo make install
@@ -20,3 +20,6 @@ I don't have access to a machine with a D compiler on either of those platforms.
 
 This software is released under the Boost License 1.0.
 
+christopher.j.rooney
+at
+gmail
