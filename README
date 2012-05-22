@@ -1,0 +1,22 @@
+midisplit is a utility that splits MIDI files into tracks based on notes or
+instruments.  The motivation was that software drum machines generally put 
+all drums and percussion on to a single track when exporting to MIDI.  This 
+prevents the drums from being individually mixed, effected, etc.  Anyway, there
+are a bunch of options and ways to split or filter the MIDI file.  Check the 
+man page.
+
+To build you need a D compiler.  The makefile assumes dmd.  If you install, it 
+defaults to /usr/local. just do
+
+make
+sudo make install
+
+The utility is standard D and should compile on Windows or OS X without problems
+just by
+
+dmd midisplit.d
+
+I don't have access to a machine with a D compiler on either of those platforms.
+
+This software is released under the Boost License 1.0.
+
